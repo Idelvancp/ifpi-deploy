@@ -100,7 +100,7 @@
                                 ${botaoAcessar}
                                 <button class="btn btn-sm btn-warning me-1" onclick="pararContainer('${idCurto}')">Parar</button>
                                 <button class="btn btn-sm btn-success me-1" onclick="iniciarContainer('${idCurto}')">Iniciar</button>
-                                <button class="btn btn-sm btn-danger" onclick="deletarContainer('${idCurto}')">Excluir</button>
+                                <button class="btn btn-sm btn-danger" onclick="deletarContainer('${idCurto}', ${porta !== null ? porta : 'null'})">Excluir</button>
                             </td>
                         </tr>
                     `;
@@ -153,23 +153,39 @@
         .catch(err => alert("Erro ao iniciar o container: " + err));
     }
 
-    function deletarContainer(id) {
-        if (!confirm("Deseja realmente excluir o container " + id + "?")) return;
-
+    function deletarContainer(id, porta) {
         fetch(`/api/docker/container/${id}`, {
             method: 'DELETE',
             headers: {
                 'X-CSRF-TOKEN': token,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                porta: porta ?? null
+            })
         })
-        .then(response => response.json())
+        .then(async response => {
+            if (!response.ok) {
+                throw new Error(`Erro HTTP ${response.status}`);
+            }
+
+            // Se for 204, não há body
+            if (response.status === 204) {
+                return { message: 'Container removido com sucesso' };
+            }
+
+            return response.json();
+        })
         .then(result => {
             alert(result.message);
             listarContainers();
         })
-        .catch(err => alert("Erro ao excluir o container: " + err));
+        .catch(err => {
+            console.error(err);
+            alert("Erro ao excluir o container");
+        });
     }
+
 
     document.addEventListener("DOMContentLoaded", function () {
     listarContainers();

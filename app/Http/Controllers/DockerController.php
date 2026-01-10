@@ -6,6 +6,7 @@ use App\Services\DockerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 
 class DockerController extends Controller
 {
@@ -203,8 +204,11 @@ class DockerController extends Controller
     /**
      * Remover um container
      */
-    public function destroy(string $containerId): JsonResponse
+    public function destroy(Request $request, string $containerId): JsonResponse
     {
+        $user = auth()->user(); // aluno logado
+        $uuid = (string) $user->student_id;
+        
         $command = sprintf(
             'curl --silent --output /dev/null --write-out "%%{http_code}" ' .
             '--unix-socket /var/run/docker.sock -X DELETE ' .
@@ -214,7 +218,15 @@ class DockerController extends Controller
 
         $httpCode = exec($command, $output, $exitCode);
 
+        $porta = $request->input('porta'); // pode ser null
+        $containerName = $uuid . '-' . $porta;
+        $pathApp="/srv/student-homes/$uuid/$containerName";
+
         $success = ($exitCode === 0 && in_array($httpCode, ['204']));
+        
+        if (File::exists($pathApp)) {
+            File::deleteDirectory($pathApp);
+        }
 
         return response()->json([
             'success'    => $success,
