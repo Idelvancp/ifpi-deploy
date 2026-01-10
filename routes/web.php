@@ -20,8 +20,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/container/create', [DockerController::class, 'create'])->name('docker.create');
         Route::get('/containers/{containerId}', [DockerController::class, 'show'])->name('docker.show');
         Route::post('/container/{containerId}/start', [DockerController::class, 'start'])->name('docker.start');
-        Route::post('/containers/{containerId}/stop', [DockerController::class, 'stop'])->name('docker.stop');
-        Route::delete('/containers/{containerId}', [DockerController::class, 'destroy'])->name('docker.destroy');
+        Route::post('/container/{containerId}/stop', [DockerController::class, 'stop'])->name('docker.stop');
+        Route::delete('/container/{containerId}', [DockerController::class, 'destroy'])->name('docker.destroy');
         Route::get('/containers/{containerId}/logs', [DockerController::class, 'logs'])->name('docker.logs');
         Route::get('/status', [DockerController::class, 'status'])->name('docker.status');
     });

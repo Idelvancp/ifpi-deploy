@@ -83,7 +83,7 @@
     function pararContainer(id) {
         if (!confirm("Deseja parar o container " + id + "?")) return;
 
-        fetch(`/api/docker/containers/${id}/stop`, {
+        fetch(`/api/docker/container/${id}/stop`, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': token,
@@ -117,22 +117,32 @@
     }
 
     function deletarContainer(id) {
-        if (!confirm("Deseja realmente excluir o container " + id + "?")) return;
+        if (!confirm(`Deseja realmente excluir o container ${id}?`)) return;
 
         fetch(`/api/docker/containers/${id}`, {
             method: 'DELETE',
             headers: {
-                'X-CSRF-TOKEN': token,
-                'Content-Type': 'application/json'
+                'X-CSRF-TOKEN': token // somente se estiver em web.php
             }
         })
-        .then(response => response.json())
+        .then(async response => {
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Erro ao remover container');
+            }
+
+            return data;
+        })
         .then(result => {
             alert(result.message);
             listarContainers();
         })
-        .catch(err => alert("Erro ao excluir o container: " + err));
+        .catch(err => {
+            alert("Erro ao excluir o container: " + err.message);
+        });
     }
+
 
     </script>
 </body>

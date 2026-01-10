@@ -71,6 +71,24 @@
                     let idCurto = container.Id.substring(0,12);
                     let nome = container.Names ? container.Names[0].replace("/", "") : "-";
 
+                    let porta = null;
+                    if (Array.isArray(container.Ports)) {
+                        let portaPublica = container.Ports.find(p => p.PublicPort);
+                        if (portaPublica) {
+                            porta = portaPublica.PublicPort;
+                        }
+                    }
+
+                    // 🔗 botão acessar
+                    let botaoAcessar = porta
+                        ? `<a href="http://localhost:${porta}" target="_blank"
+                            class="btn btn-sm btn-primary me-1"
+                            title="Acessar aplicação">
+                            🚀
+                        </a>`
+                        : `<button class="btn btn-sm btn-secondary me-1" disabled title="Sem porta publicada">🚫</button>`;
+
+
                     let row = `
                         <tr>
                             <td>${idCurto}</td>
@@ -79,6 +97,7 @@
                             <td>${container.State}</td>
                             <td>${container.Status}</td>
                             <td class="text-center">
+                                ${botaoAcessar}
                                 <button class="btn btn-sm btn-warning me-1" onclick="pararContainer('${idCurto}')">Parar</button>
                                 <button class="btn btn-sm btn-success me-1" onclick="iniciarContainer('${idCurto}')">Iniciar</button>
                                 <button class="btn btn-sm btn-danger" onclick="deletarContainer('${idCurto}')">Excluir</button>
@@ -101,7 +120,7 @@
     function pararContainer(id) {
         if (!confirm("Deseja parar o container " + id + "?")) return;
 
-        fetch(`/api/docker/containers/${id}/stop`, {
+        fetch(`/api/docker/container/${id}/stop`, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': token,
@@ -137,7 +156,7 @@
     function deletarContainer(id) {
         if (!confirm("Deseja realmente excluir o container " + id + "?")) return;
 
-        fetch(`/api/docker/containers/${id}`, {
+        fetch(`/api/docker/container/${id}`, {
             method: 'DELETE',
             headers: {
                 'X-CSRF-TOKEN': token,

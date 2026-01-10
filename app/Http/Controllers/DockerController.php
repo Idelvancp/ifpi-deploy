@@ -205,13 +205,31 @@ class DockerController extends Controller
      */
     public function destroy(string $containerId): JsonResponse
     {
-        $success = $this->dockerService->removeContainer($containerId, true);
-        
+        $command = sprintf(
+            'curl --silent --output /dev/null --write-out "%%{http_code}" ' .
+            '--unix-socket /var/run/docker.sock -X DELETE ' .
+            'http://localhost/containers/%s?force=true&v=true',
+            escapeshellarg($containerId)
+        );
+
+        $httpCode = exec($command, $output, $exitCode);
+
+        $success = ($exitCode === 0 && in_array($httpCode, ['204']));
+
         return response()->json([
-            'success' => $success,
-            'message' => $success ? 'Container removed' : 'Failed to remove container'
+            'success'    => $success,
+            'http_code' => $httpCode,
+            'exit_code' => $exitCode,
+            'message'   => match ($httpCode) {
+                '204' => 'Container removido com sucesso',
+                '404' => 'Container não encontrado',
+                '409' => 'Container em uso (não foi possível remover)',
+                '500' => 'Erro interno do Docker ao remover o container',
+                default => 'Falha ao remover o container'
+            }
         ]);
     }
+
 
     /**
      * Obter informações de um container
