@@ -24,6 +24,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/container/{containerId}', [DockerController::class, 'destroy'])->name('docker.destroy');
         Route::get('/containers/{containerId}/logs', [DockerController::class, 'logs'])->name('docker.logs');
         Route::get('/status', [DockerController::class, 'status'])->name('docker.status');
+        Route::post('/container/{containerId}/upload', [DockerController::class, 'upload'])->name('docker.upload');
     });
 
     // Interface Web do Docker (página)

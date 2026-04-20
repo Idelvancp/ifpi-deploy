@@ -12,6 +12,7 @@
 
         <button id="listarBtn" class="btn btn-primary mb-3">Listar Containers</button>
         <button class="btn btn-primary mb-3" onclick="criarAmbiente()">Deploy</button>
+        <input type="file" id="arquivoProjeto" accept=".zip" style="display:none">
 
         <table class="table table-striped align-middle" id="containersTable" style="display:none;">
             <thead>
@@ -98,6 +99,7 @@
                             <td>${container.Status}</td>
                             <td class="text-center">
                                 ${botaoAcessar}
+                                <button class="btn btn-sm btn-info me-1" onclick="selecionarArquivo('${idCurto}', '${nome}')">Upload</button>
                                 <button class="btn btn-sm btn-warning me-1" onclick="pararContainer('${idCurto}')">Parar</button>
                                 <button class="btn btn-sm btn-success me-1" onclick="iniciarContainer('${idCurto}')">Iniciar</button>
                                 <button class="btn btn-sm btn-danger" onclick="deletarContainer('${idCurto}', ${porta !== null ? porta : 'null'})">Excluir</button>
@@ -183,6 +185,99 @@
         .catch(err => {
             console.error(err);
             alert("Erro ao excluir o container");
+        });
+    }
+
+    function selecionarArquivo(containerId, containerName) {
+        const input = document.getElementById('arquivoProjeto');
+
+        input.onchange = () => {
+            uploadProjeto(containerId, containerName);
+        };
+
+        input.click(); 
+    }
+
+    function uploadProjeto(containerId, containerName) {
+        const input = document.getElementById('arquivoProjeto');
+
+        if (!input.files.length) {
+            alert("Selecione um arquivo .zip primeiro!");
+            return;
+        }
+
+        const file = input.files[0];
+
+        // aceita somente zip
+        if (!file.name.toLowerCase().endsWith('.zip')) {
+            alert("Envie apenas arquivos .zip");
+            input.value = "";
+            return;
+        }
+
+        // limite frontend (200MB)
+        const maxSize = 200 * 1024 * 1024;
+
+        if (file.size > maxSize) {
+            alert("Arquivo maior que 200MB.");
+            input.value = "";
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("containerName", containerName);
+
+        fetch(`/api/docker/container/${containerId}/upload`, {
+            method: "POST",
+            headers: {
+                "X-CSRF-TOKEN": token,
+                "Accept": "application/json"
+            },
+            body: formData
+        })
+        .then(async res => {
+            const text = await res.text();
+
+            console.log("Resposta servidor:", text);
+
+            // Detecta erro de tamanho vindo do PHP/Laravel
+            if (
+                text.includes("POST Content-Length") ||
+                text.includes("The POST data is too large") ||
+                text.includes("PostTooLargeException")
+            ) {
+                throw new Error("Arquivo excede o limite permitido no servidor.");
+            }
+
+            // erro HTTP comum
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+
+            // tenta extrair JSON mesmo se vier HTML + JSON misturado
+            const inicioJson = text.indexOf("{");
+
+            if (inicioJson === -1) {
+                throw new Error("Resposta inválida do servidor.");
+            }
+
+            const jsonLimpo = text.substring(inicioJson);
+
+            try {
+                return JSON.parse(jsonLimpo);
+            } catch (e) {
+                throw new Error("Não foi possível interpretar a resposta do servidor.");
+            }
+        })
+        .then(data => {
+            alert(data.message || "Upload realizado com sucesso!");
+            input.value = "";
+        })
+        .catch(err => {
+            console.error("Erro upload:", err);
+            alert("Erro no upload: " + err.message);
+            input.value = "";
         });
     }
 

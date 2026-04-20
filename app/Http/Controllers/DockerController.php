@@ -97,6 +97,7 @@ class DockerController extends Controller
             throw new \RuntimeException('Nenhuma porta disponível');
         }
 
+        
         $randomPort = $freePorts[array_rand($freePorts)];
         $containerName = $uuid . '-' . $randomPort;
 
@@ -280,6 +281,125 @@ class DockerController extends Controller
             'success' => $isRunning,
             'docker_running' => $isRunning,
             'message' => $isRunning ? 'Docker is running' : 'Docker is not available'
+        ]);
+    }
+
+    public function upload(Request $request, string $containerId): JsonResponse
+    {
+        $user = auth()->user();
+        $uuid = (string) $user->student_id;
+
+        $request->validate([
+            'file' => 'required|file|mimes:zip|max:204800', // 200MB
+            'containerName' => 'required|string'
+        ]);
+
+        $containerName = basename($request->input('containerName'));
+
+        // segurança
+        if (!str_starts_with($containerName, $uuid . '-')) {
+            return response()->json([
+                'message' => 'Container inválido.'
+            ], 403);
+        }
+
+        $destino = "/srv/student-homes/$uuid/$containerName";
+
+        if (!File::exists($destino)) {
+            File::makeDirectory($destino, 0755, true);
+        }
+
+        $arquivo = $request->file('file');
+
+        $zipPath = $destino . '/projeto.zip';
+        $tempPath = $destino . '/novo_projeto';
+        $appPath = $destino . '/app';
+
+        // limpa zip antigo
+        if (File::exists($zipPath)) {
+            File::delete($zipPath);
+        }
+
+        // limpa pasta temporária antiga
+        if (File::exists($tempPath)) {
+            File::deleteDirectory($tempPath);
+        }
+
+        File::makeDirectory($tempPath, 0755, true);
+
+        // salva zip
+        $arquivo->move($destino, 'projeto.zip');
+
+        $zip = new \ZipArchive();
+
+        if ($zip->open($zipPath) !== true) {
+            return response()->json([
+                'message' => 'Erro ao abrir arquivo ZIP.'
+            ], 500);
+        }
+
+        // extrai em pasta temporária
+        $zip->extractTo($tempPath);
+        $zip->close();
+
+        // remove zip
+        File::delete($zipPath);
+
+        /*
+            Se o zip vier com pasta raiz:
+            projeto.zip
+            meu-site/
+                manage.py
+                ...
+        */
+        $itens = array_values(array_diff(scandir($tempPath), ['.', '..']));
+
+        if (count($itens) === 1 && is_dir($tempPath . '/' . $itens[0])) {
+            $pastaExtraida = $tempPath . '/' . $itens[0];
+        } else {
+            $pastaExtraida = $tempPath;
+        }
+
+        // remove app antiga SOMENTE após sucesso da extração
+        if (File::exists($appPath)) {
+            File::deleteDirectory($appPath);
+        }
+
+        // renomeia novo projeto para app
+        rename($pastaExtraida, $appPath);
+
+        // se sobrou pasta temporária vazia
+        if (File::exists($tempPath)) {
+            File::deleteDirectory($tempPath);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Executa comandos Django dentro do container
+        |--------------------------------------------------------------------------
+        */
+
+        // pip install
+        $cmd1 = sprintf(
+            "docker exec %s sh -c 'cd /app && pip install -r requirements.txt 2>&1'",
+            escapeshellarg($containerName)
+        );
+
+        $pipOutput = shell_exec($cmd1);
+
+        // migrate
+        $cmd2 = sprintf(
+            "docker exec %s sh -c 'cd /app && python manage.py migrate 2>&1'",
+            escapeshellarg($containerName)
+        );
+
+        $migrateOutput = shell_exec($cmd2);
+
+        return response()->json([
+            'message' => 'Projeto publicado com sucesso.',
+            'container' => $containerId,
+            'pip_install' => $pipOutput,
+            'migrate' => $migrateOutput
         ]);
     }
 }
