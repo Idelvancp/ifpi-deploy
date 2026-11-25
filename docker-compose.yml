@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      context: .
+    container_name: app-deploy
+    ports:
+      - "80:80"
+      - "8000:8000"
+    volumes:
+      - ./public:/var/www/html
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/student-homes:/srv/student-homes
+    links:
+      - "db:db"
+
+  db:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=db-app
+      - POSTGRES_USER=ifpiuser
+      - POSTGRES_PASSWORD=ifti20205
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+    - postgres-vol:/var/lib/postgresql/data/pgdata:rw
+
+volumes:
+  postgres-vol: {}
+
